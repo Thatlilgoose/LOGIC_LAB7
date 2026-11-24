@@ -1,4 +1,5 @@
 #include <iostream>
+#include <limits>
 #include <random>
 #include <vector>
 
@@ -41,10 +42,11 @@ void dfsMatrixRecursive(const Matrix& matrix, int vertex, std::vector<bool>& vis
     }
 }
 
-std::vector<int> traverseMatrixRecursive(const Matrix& matrix) {
+std::vector<int> traverseMatrixRecursive(const Matrix& matrix, int start) {
     std::vector<bool> visited(matrix.size(), false);
     std::vector<int> order;
 
+    dfsMatrixRecursive(matrix, start, visited, order);
     for (int vertex = 0; vertex < static_cast<int>(matrix.size()); ++vertex) {
         if (!visited[vertex]) {
             dfsMatrixRecursive(matrix, vertex, visited, order);
@@ -80,10 +82,11 @@ void dfsListRecursive(const AdjacencyList& list, int vertex, std::vector<bool>& 
     }
 }
 
-std::vector<int> traverseListRecursive(const AdjacencyList& list) {
+std::vector<int> traverseListRecursive(const AdjacencyList& list, int start) {
     std::vector<bool> visited(list.size(), false);
     std::vector<int> order;
 
+    dfsListRecursive(list, start, visited, order);
     for (int vertex = 0; vertex < static_cast<int>(list.size()); ++vertex) {
         if (!visited[vertex]) {
             dfsListRecursive(list, vertex, visited, order);
@@ -93,16 +96,23 @@ std::vector<int> traverseListRecursive(const AdjacencyList& list) {
     return order;
 }
 
-std::vector<int> traverseMatrixIterative(const Matrix& matrix) {
+std::vector<int> traverseMatrixIterative(const Matrix& matrix, int start) {
     std::vector<bool> visited(matrix.size(), false);
     std::vector<int> order;
 
-    for (int start = 0; start < static_cast<int>(matrix.size()); ++start) {
-        if (visited[start]) {
+    std::vector<int> starts{start};
+    for (int vertex = 0; vertex < static_cast<int>(matrix.size()); ++vertex) {
+        if (vertex != start) {
+            starts.push_back(vertex);
+        }
+    }
+
+    for (int componentStart : starts) {
+        if (visited[componentStart]) {
             continue;
         }
 
-        std::vector<int> stack{start};
+        std::vector<int> stack{componentStart};
 
         while (!stack.empty()) {
             int vertex = stack.back();
@@ -136,28 +146,80 @@ void printOrder(const std::vector<int>& order) {
 
 int main() {
     int vertexCount;
-    std::cout << "Введите количество вершин: ";
-    std::cin >> vertexCount;
-
-    if (!std::cin || vertexCount <= 0) {
+    while (true) {
+        std::cout << "Введите количество вершин: ";
+        if (std::cin >> vertexCount && vertexCount > 0) {
+            break;
+        }
         std::cerr << "Количество вершин должно быть положительным числом.\n";
-        return 1;
+        if (std::cin.eof()) {
+            return 1;
+        }
+        std::cin.clear();
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
     }
 
-    Matrix matrix = generateMatrix(vertexCount, 0.35);
+    double edgeProbability;
+    while (true) {
+        std::cout << "Введите вероятность появления ребра (от 0 до 1): ";
+        if (std::cin >> edgeProbability &&
+            edgeProbability >= 0.0 && edgeProbability <= 1.0) {
+            break;
+        }
+        std::cerr << "Вероятность должна быть числом от 0 до 1.\n";
+        if (std::cin.eof()) {
+            return 1;
+        }
+        std::cin.clear();
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    }
+
+    Matrix matrix = generateMatrix(vertexCount, edgeProbability);
     AdjacencyList list = makeAdjacencyList(matrix);
 
     std::cout << "\nМатрица смежности:\n";
     printMatrix(matrix);
 
+    int startVertex;
+    while (true) {
+        std::cout << "Введите начальную вершину обхода (от 1 до " << vertexCount << "): ";
+        if (!(std::cin >> startVertex)) {
+            std::cerr << "Введите целый номер вершины от 1 до " << vertexCount << ".\n";
+            if (std::cin.eof()) {
+                return 1;
+            }
+            std::cin.clear();
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            continue;
+        }
+        if (startVertex < 1 || startVertex > vertexCount) {
+            std::cerr << "Номер вершины должен быть от 1 до " << vertexCount << ".\n";
+            continue;
+        }
+
+        bool isolated = true;
+        for (int neighbour = 0; neighbour < vertexCount; ++neighbour) {
+            if (matrix[startVertex - 1][neighbour] == 1) {
+                isolated = false;
+                break;
+            }
+        }
+        if (!isolated) {
+            break;
+        }
+        std::cout << "Вершина " << startVertex
+                  << " изолирована. Выберите другую вершину.\n";
+    }
+    const int start = startVertex - 1;
+
     std::cout << "\nОбход DFS рекурсивно по матрице:\n";
-    printOrder(traverseMatrixRecursive(matrix));
+    printOrder(traverseMatrixRecursive(matrix, start));
 
     std::cout << "\nОбход DFS рекурсивно по спискам смежности:\n";
-    printOrder(traverseListRecursive(list));
+    printOrder(traverseListRecursive(list, start));
 
     std::cout << "\nОбход DFS нерекурсивно по матрице:\n";
-    printOrder(traverseMatrixIterative(matrix));
+    printOrder(traverseMatrixIterative(matrix, start));
 
     return 0;
 }
